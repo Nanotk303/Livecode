@@ -1,0 +1,13 @@
+.DS_Store
+*.fasl
+*.xfasl
+*.ofasl
+*.lx64fsl
+*.ufsl
+*.pfsl
+*.dfsl
+*.lib
+*.o
+*.dylib
+outputs/
+work/

@@ -41,9 +41,11 @@ change.
    (load "/path/to/Livecode/load.lisp")
    ```
 
-3. Select a stable timing preset:
+3. Optional: if you hear timing instability under heavier loads, enable the
+   ahead-scheduled timing preset:
 
    ```lisp
+   ;; Optional: use this if you hear timing instability under heavier loads.
    (use-livecode-rock-solid-timing :ahead 0.35d0)
    ```
 

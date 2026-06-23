@@ -56,11 +56,13 @@ To test a note without starting Livecode:
 (livecode:test-midi-output :port "Bus 1")
 ```
 
-## Recommended timing preset
+## Optional timing preset
 
-For practical live use:
+The default timing can already work well in many setups. If you hear timing
+instability under heavier loads, enable the ahead-scheduled timing preset:
 
 ```lisp
+;; Optional: use this if you hear timing instability under heavier loads.
 (use-livecode-rock-solid-timing :ahead 0.35d0)
 (setf livecode:*retrigger-note-off-advance-beats* 0)
 (setf livecode:*midi-clock-event-offset-seconds* 0d0)

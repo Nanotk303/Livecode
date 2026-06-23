@@ -5,10 +5,12 @@ to a separate port.
 
 ## Stable scheduling
 
-The most stable preset schedules MIDI ahead of time and uses CoreMIDI
-timestamps:
+The default timing can already be accurate enough in many setups. If you hear
+timing instability under heavier loads, the most stable preset schedules MIDI
+ahead of time and uses CoreMIDI timestamps:
 
 ```lisp
+;; Optional: use this if you hear timing instability under heavier loads.
 (use-livecode-rock-solid-timing :ahead 0.35d0)
 ```
 

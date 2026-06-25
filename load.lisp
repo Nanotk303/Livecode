@@ -46,6 +46,7 @@ signals \"obsolete structure\" errors during reload.
   (load (merge-pathnames "src/package.lisp" root))
   (load (merge-pathnames "src/model.lisp" root))
   (load (merge-pathnames "src/platform.lisp" root))
+  (load (merge-pathnames "src/link.lisp" root))
   (load (merge-pathnames "src/omn.lisp" root))
   (load (merge-pathnames "src/soundsets.lisp" root))
   (load (merge-pathnames "src/midi.lisp" root))

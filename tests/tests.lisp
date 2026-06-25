@@ -723,6 +723,28 @@
     (check (= (livecode::next-cycle-origin 100d0 scene 100.01d0)
               100d0))))
 
+(defun test-link-initial-start-uses-link-quantum ()
+  (let ((scene (livecode::make-scene :length 32
+                                     :tempo 120
+                                     :link-enabled t
+                                     :link-quantum 4))
+        (original (symbol-function
+                   'livecode::ableton-link-next-quantized-time))
+        seen-quantum)
+    (unwind-protect
+         (progn
+           (setf (symbol-function
+                  'livecode::ableton-link-next-quantized-time)
+                 (lambda (quantum &optional minimum-time)
+                   (declare (ignore minimum-time))
+                   (setf seen-quantum quantum)
+                   123d0))
+           (check (= (livecode::link-scene-cycle-start-time scene) 123d0))
+           (check (= seen-quantum 4)))
+      (setf (symbol-function
+             'livecode::ableton-link-next-quantized-time)
+            original))))
+
 (defun run-tests ()
   (setf *failures* nil)
   (test-fallback-omn)
@@ -761,6 +783,7 @@
   (test-cycle-boundary-predispatches-next-initial-events)
   (test-link-scene-inspection)
   (test-link-cycle-origin-keeps-scheduled-grid)
+  (test-link-initial-start-uses-link-quantum)
   ;; The scheduler itself is exercised separately because timing tests are
   ;; intentionally not part of the deterministic core suite.
   (if *failures*

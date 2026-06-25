@@ -271,4 +271,4 @@ Build the bridge in native/ first; then call this function before using
     (setf (scene-tempo scene) (ableton-link-tempo))))
 
 (defun link-scene-cycle-start-time (scene &optional minimum-time)
-  (ableton-link-next-quantized-time (scene-length scene) minimum-time))
+  (ableton-link-next-quantized-time (scene-link-quantum scene) minimum-time))

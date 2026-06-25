@@ -27,6 +27,15 @@
    #:test-midi-mts-output
    #:test-midi-note-separation
    #:test-midi-clock-output
+   #:load-ableton-link
+   #:use-ableton-link
+   #:stop-ableton-link
+   #:ableton-link-status
+   #:ableton-link-start
+   #:ableton-link-stop
+   #:*ableton-link-library-path*
+   #:*ableton-link-default-quantum*
+   #:*ableton-link-start-stop-sync*
    #:reload-livecode-soundsets
    #:set-livecode-soundset-directory
    #:live-soundset-status

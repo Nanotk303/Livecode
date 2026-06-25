@@ -5,7 +5,8 @@ This is a compact overview of the user-facing API.
 ## Main commands
 
 ```lisp
-(live tracks &key tempo quantize beats-per-bar midi-clock-port)
+(live tracks &key tempo quantize beats-per-bar midi-clock-port
+                  link link-quantum link-start-stop)
 (stop-live)
 (panic)
 (live-status)
@@ -47,6 +48,23 @@ This is a compact overview of the user-facing API.
 (use-livecode-rock-solid-timing :ahead 0.35d0)
 ```
 
+## Ableton Link
+
+```lisp
+(load-ableton-link "/path/to/liblivecode-link.dylib")
+(use-ableton-link :tempo 120 :quantum 4 :start-stop t)
+(ableton-link-status)
+(ableton-link-start :quantum 4)
+(ableton-link-stop)
+(stop-ableton-link)
+```
+
+Use Link from `live`:
+
+```lisp
+(live tracks :tempo 120 :link t :link-quantum 4)
+```
+
 ## Soundsets
 
 ```lisp
@@ -68,4 +86,7 @@ livecode:*mts-enabled*
 livecode:*sound-set-directory*
 livecode:*sound-set-auto-reload*
 livecode:*send-redundant-articulation-messages*
+livecode:*ableton-link-library-path*
+livecode:*ableton-link-default-quantum*
+livecode:*ableton-link-start-stop-sync*
 ```

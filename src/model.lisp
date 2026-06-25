@@ -15,6 +15,9 @@
   (length 4 :type rational)
   (tempo 120 :type real)
   midi-clock-port
+  (link-enabled nil)
+  (link-quantum 4 :type real)
+  (link-start-stop nil)
   source)
 
 (defstruct engine

@@ -27,6 +27,7 @@ change.
 - Send MIDI directly to named macOS IAC/CoreMIDI destinations.
 - Schedule MIDI events ahead with timestamped CoreMIDI output for stable timing.
 - Optionally send MIDI Clock to a separate destination.
+- Optionally follow an Ableton Link session through a native bridge.
 - Support MTS Single Note Tuning Change messages for microtonal pitches.
 - Read Opusmodus `def-sound-set` files and use OMN articulations as
   soundset keyswitches / controllers / program changes.
@@ -88,6 +89,7 @@ Emergency all-notes-off:
 - [Installation](docs/installation.md)
 - [Live coding workflow](docs/live-coding.md)
 - [Timing and MIDI Clock](docs/timing.md)
+- [Ableton Link synchronization](docs/ableton-link.md)
 - [Opusmodus soundsets](docs/soundsets.md)
 - [MTS microtuning](docs/mts.md)
 - [API reference](docs/api.md)

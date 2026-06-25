@@ -591,10 +591,18 @@ This covers the VSL style used in the supplied files:
     (:controller 8)
     (:keyswitch-off 9)))
 
-(defun compile-scene (tracks &key (tempo 120) midi-clock-port)
+(defun compile-scene (tracks &key (tempo 120) midi-clock-port
+                                   link
+                                   (link-quantum *ableton-link-default-quantum*)
+                                   (link-start-stop
+                                    *ableton-link-start-stop-sync*))
   "Compile the quoted instrument forms accepted by LIVE."
   (unless (and (realp tempo) (plusp tempo))
     (error "Tempo must be a positive number, got ~S." tempo))
+  (when link
+    (unless (and (realp link-quantum) (plusp link-quantum))
+      (error "Link quantum must be a positive beat count, got ~S."
+             link-quantum)))
   (let (events (length 0))
     (dolist (track (resolve-source tracks))
       (multiple-value-bind (track-events track-length)
@@ -614,6 +622,9 @@ This covers the VSL style used in the supplied files:
                                      (event-priority right)))))))
     (make-scene :events events :length length :tempo tempo
                 :midi-clock-port midi-clock-port
+                :link-enabled link
+                :link-quantum link-quantum
+                :link-start-stop link-start-stop
                 :source tracks)))
 
 (defun seconds-per-beat (scene)
@@ -657,13 +668,17 @@ reload, and accessing any slot on such an obsolete ENGINE can signal an error.
          (unless beats
            (error "Quantization must be :IMMEDIATE, :BEAT, :BAR, :CYCLE or a positive beat count, got ~S."
                   quantization))
-         (let* ((quantum-seconds (* beats (seconds-per-beat scene)))
-                (elapsed (max 0d0 (- now origin)))
-                (index (ceiling (/ elapsed quantum-seconds)))
-                (target (+ origin (* index quantum-seconds))))
-           (if (< target (- now 0.001d0))
-               (+ target quantum-seconds)
-               target)))))))
+         (if (scene-link-enabled scene)
+             (progn
+               (ensure-ableton-link-loaded)
+               (ableton-link-next-quantized-time beats now))
+             (let* ((quantum-seconds (* beats (seconds-per-beat scene)))
+                    (elapsed (max 0d0 (- now origin)))
+                    (index (ceiling (/ elapsed quantum-seconds)))
+                    (target (+ origin (* index quantum-seconds))))
+               (if (< target (- now 0.001d0))
+                   (+ target quantum-seconds)
+                   target))))))))
 
 (defun pending-swap-time (engine)
   (with-engine-lock (engine)
@@ -1038,9 +1053,13 @@ If the note-on is queued but the scheduler later swaps before reaching the
 Small dispatch/scheduling delays must not accumulate into tempo drift. After
 a suspension longer than one complete loop, rebasing avoids a burst of stale
 events while trying to catch up."
-  (if (> (- now scheduled-start) (scene-duration-seconds scene))
-      now
-      scheduled-start))
+  (cond
+    ((scene-link-enabled scene)
+     (refresh-link-tempo-for-scene scene)
+     (link-scene-cycle-start-time scene now))
+    ((> (- now scheduled-start) (scene-duration-seconds scene))
+     now)
+    (t scheduled-start)))
 
 (defun midi-clock-snapshot (engine)
   (with-engine-lock (engine)
@@ -1193,6 +1212,15 @@ events while trying to catch up."
           (setf (engine-midi-clock-port engine) nil
                 (engine-midi-clock-running-p engine) nil)))))
 
+(defun initial-cycle-start-time (scene)
+  (if (scene-link-enabled scene)
+      (progn
+        (configure-link-for-scene scene)
+        (link-scene-cycle-start-time scene
+                                    (timestamped-safe-swap-request-time
+                                     (monotonic-seconds))))
+      (monotonic-seconds)))
+
 (defun stop-midi-clock (engine)
   (when engine
     (with-engine-lock (engine)
@@ -1201,16 +1229,19 @@ events while trying to catch up."
   :stopped)
 
 (defun clock-loop (engine)
-  (setf (engine-cycle-start-time engine) (monotonic-seconds))
+  (setf (engine-cycle-start-time engine)
+        (initial-cycle-start-time (engine-current-scene engine)))
   (configure-midi-clock engine (engine-current-scene engine))
-  (when (scene-midi-clock-port (engine-current-scene engine))
+  (when (and (scene-midi-clock-port (engine-current-scene engine))
+             (not (scene-link-enabled (engine-current-scene engine))))
     (setf (engine-cycle-start-time engine)
           (engine-midi-clock-start-time engine)))
   (unwind-protect
        (handler-case
            (loop while (engine-live-p engine)
                  for scene = (engine-current-scene engine)
-                 do (multiple-value-bind (result next-start skip-next-initial-p)
+                 do (refresh-link-tempo-for-scene scene)
+                    (multiple-value-bind (result next-start skip-next-initial-p)
                         (run-one-cycle engine scene
                                        (engine-cycle-start-time engine)
                                        (engine-skip-initial-events-p engine))
@@ -1227,6 +1258,7 @@ events while trying to catch up."
                              (take-pending-scene engine)
                            (when new-scene
                              (release-active-notes)
+                             (configure-link-for-scene new-scene)
                              (configure-midi-clock engine new-scene)
                              (setf (engine-current-scene engine) new-scene
                                    (engine-cycle-start-time engine) start-time
@@ -1247,6 +1279,8 @@ events while trying to catch up."
     (prepare-midi-realtime-sender))
   (ensure-timestamped-events-ready)
   (ensure-mts-ready)
+  (when (scene-link-enabled scene)
+    (configure-link-for-scene scene))
   (reset-event-lateness-stats)
   (let ((engine (make-engine :lock (make-engine-lock)
                              :running-p t
@@ -1268,6 +1302,8 @@ events while trying to catch up."
     (prepare-midi-realtime-sender))
   (ensure-timestamped-events-ready)
   (ensure-mts-ready)
+  (when (scene-link-enabled scene)
+    (configure-link-for-scene scene))
   (if (and *engine* (engine-live-p *engine*))
       (progn
         (with-engine-lock (*engine*)
@@ -1323,6 +1359,15 @@ events while trying to catch up."
             (list :running t
                   :cycle (engine-cycle-number *engine*)
                   :tempo (scene-tempo (engine-current-scene *engine*))
+                  :link-enabled
+                  (scene-link-enabled (engine-current-scene *engine*))
+                  :link-status
+                  (and (scene-link-enabled (engine-current-scene *engine*))
+                       (ignore-errors
+                        (ableton-link-status
+                         :quantum
+                         (scene-link-quantum
+                          (engine-current-scene *engine*)))))
                   :beat-seconds
                   (seconds-per-beat (engine-current-scene *engine*))
                   :loop-beats

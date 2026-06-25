@@ -3,16 +3,26 @@
 (defun live (tracks &key (tempo 120)
                          (quantize *swap-quantum*)
                          (beats-per-bar *beats-per-bar*)
-                         midi-clock-port)
+                         midi-clock-port
+                         link
+                         (link-quantum *ableton-link-default-quantum*)
+                         (link-start-stop
+                          *ableton-link-start-stop-sync*))
   "Start Livecode or queue a replacement scene.
 
 TRACKS is a quoted list of instrument forms:
   ((name :omn source :port \"Bus 1\" :channel 1 :program 8 ...))
 
 If the clock already runs, the new scene becomes active on the next loop
-boundary. The clock thread and its time origin are not restarted."
+boundary. The clock thread and its time origin are not restarted.
+
+When LINK is true, Livecode follows the Ableton Link timeline through the
+optional native bridge. LINK-QUANTUM is the shared Link phase quantum."
   (submit-scene (compile-scene tracks :tempo tempo
-                               :midi-clock-port midi-clock-port)
+                               :midi-clock-port midi-clock-port
+                               :link link
+                               :link-quantum link-quantum
+                               :link-start-stop link-start-stop)
                 :quantize quantize
                 :beats-per-bar beats-per-bar))
 
@@ -26,14 +36,27 @@ boundary. The clock thread and its time origin are not restarted."
         :port (midi-event-port event)
         :track (midi-event-track event)))
 
-(defun live-inspect (tracks &key (tempo 120) midi-clock-port (limit 24))
+(defun live-inspect (tracks &key (tempo 120) midi-clock-port
+                                 link
+                                 (link-quantum *ableton-link-default-quantum*)
+                                 (link-start-stop
+                                  *ableton-link-start-stop-sync*)
+                                 (limit 24))
   "Compile TRACKS without starting playback and return a compact summary."
   (let* ((scene (compile-scene tracks :tempo tempo
-                               :midi-clock-port midi-clock-port))
+                               :midi-clock-port midi-clock-port
+                               :link link
+                               :link-quantum link-quantum
+                               :link-start-stop link-start-stop))
          (events (scene-events scene)))
     (list :tempo (scene-tempo scene)
           :loop-beats (scene-length scene)
           :midi-clock-port (scene-midi-clock-port scene)
+          :link-enabled (scene-link-enabled scene)
+          :link-quantum (and (scene-link-enabled scene)
+                             (scene-link-quantum scene))
+          :link-start-stop (and (scene-link-enabled scene)
+                                (scene-link-start-stop scene))
           :events (length events)
           :notes (count :note-on events :key #'midi-event-kind)
           :mts (count :mts events :key #'midi-event-kind)
@@ -240,6 +263,18 @@ when a workspace evaluates forms in a custom package."
                 #'use-livecode-safe-timing
                 (fdefinition (intern "USE-LIVECODE-ROCK-SOLID-TIMING" package))
                 #'use-livecode-rock-solid-timing
+                (fdefinition (intern "LOAD-ABLETON-LINK" package))
+                #'load-ableton-link
+                (fdefinition (intern "USE-ABLETON-LINK" package))
+                #'use-ableton-link
+                (fdefinition (intern "STOP-ABLETON-LINK" package))
+                #'stop-ableton-link
+                (fdefinition (intern "ABLETON-LINK-STATUS" package))
+                #'ableton-link-status
+                (fdefinition (intern "ABLETON-LINK-START" package))
+                #'ableton-link-start
+                (fdefinition (intern "ABLETON-LINK-STOP" package))
+                #'ableton-link-stop
                 (fdefinition (intern "TEST-MIDI-TIMESTAMPED-OUTPUT" package))
                 #'test-midi-timestamped-output
                 (fdefinition (intern "TEST-MIDI-MTS-OUTPUT" package))

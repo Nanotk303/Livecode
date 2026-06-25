@@ -699,6 +699,20 @@
         (check (equal (mapcar #'first (nreverse captured))
                       '(#x92 #x82 #x92)))))))
 
+(defun test-link-scene-inspection ()
+  (let ((summary
+          (live-inspect
+           '((lead :omn (q c4) :port "Bus 1" :channel 1))
+           :tempo 120
+           :link t
+           :link-quantum 4
+           :link-start-stop t
+           :limit 0)))
+    (check (eq (getf summary :link-enabled) t))
+    (check (= (getf summary :link-quantum) 4))
+    (check (eq (getf summary :link-start-stop) t))
+    (check (= (getf summary :notes) 1))))
+
 (defun run-tests ()
   (setf *failures* nil)
   (test-fallback-omn)
@@ -735,6 +749,7 @@
   (test-timestamped-swap-blocks-old-boundary-events)
   (test-paired-note-off-does-not-cross-swap)
   (test-cycle-boundary-predispatches-next-initial-events)
+  (test-link-scene-inspection)
   ;; The scheduler itself is exercised separately because timing tests are
   ;; intentionally not part of the deterministic core suite.
   (if *failures*

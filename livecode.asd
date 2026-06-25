@@ -8,6 +8,7 @@
   :components ((:file "src/package")
                (:file "src/model")
                (:file "src/platform")
+               (:file "src/link")
                (:file "src/omn")
                (:file "src/soundsets")
                (:file "src/midi")

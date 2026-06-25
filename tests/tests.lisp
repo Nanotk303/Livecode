@@ -713,6 +713,16 @@
     (check (eq (getf summary :link-start-stop) t))
     (check (= (getf summary :notes) 1))))
 
+(defun test-link-cycle-origin-keeps-scheduled-grid ()
+  (let ((scene (livecode::make-scene :length 4
+                                     :tempo 120
+                                     :link-enabled t)))
+    ;; At a Link cycle boundary the scheduler may return a few milliseconds
+    ;; late. That must not be interpreted as "wait until the next Link
+    ;; boundary", otherwise a whole cycle can go silent before playback resumes.
+    (check (= (livecode::next-cycle-origin 100d0 scene 100.01d0)
+              100d0))))
+
 (defun run-tests ()
   (setf *failures* nil)
   (test-fallback-omn)
@@ -750,6 +760,7 @@
   (test-paired-note-off-does-not-cross-swap)
   (test-cycle-boundary-predispatches-next-initial-events)
   (test-link-scene-inspection)
+  (test-link-cycle-origin-keeps-scheduled-grid)
   ;; The scheduler itself is exercised separately because timing tests are
   ;; intentionally not part of the deterministic core suite.
   (if *failures*

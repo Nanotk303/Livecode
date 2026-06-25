@@ -1056,7 +1056,9 @@ events while trying to catch up."
   (cond
     ((scene-link-enabled scene)
      (refresh-link-tempo-for-scene scene)
-     (link-scene-cycle-start-time scene now))
+     (if (> (- now scheduled-start) (scene-duration-seconds scene))
+         (link-scene-cycle-start-time scene now)
+         scheduled-start))
     ((> (- now scheduled-start) (scene-duration-seconds scene))
      now)
     (t scheduled-start)))

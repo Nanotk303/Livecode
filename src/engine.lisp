@@ -1280,7 +1280,8 @@ events while trying to catch up."
   (ensure-timestamped-events-ready)
   (ensure-mts-ready)
   (when (scene-link-enabled scene)
-    (configure-link-for-scene scene))
+    (configure-link-for-scene scene)
+    (start-link-transport-for-scene scene))
   (reset-event-lateness-stats)
   (let ((engine (make-engine :lock (make-engine-lock)
                              :running-p t
@@ -1322,9 +1323,15 @@ events while trying to catch up."
   ;; Stop every engine known to this image, not only the most recently
   ;; assigned one. This also protects against accidental duplicate clocks.
   (dolist (engine (copy-list *livecode-engines*))
+    (ignore-errors
+      (when (engine-current-scene engine)
+        (stop-link-transport-for-scene (engine-current-scene engine))))
     (ignore-errors (setf (engine-running-p engine) nil))
     (ignore-errors (stop-midi-clock engine)))
   (when *engine*
+    (ignore-errors
+      (when (engine-current-scene *engine*)
+        (stop-link-transport-for-scene (engine-current-scene *engine*))))
     (ignore-errors (setf (engine-running-p *engine*) nil))
     (ignore-errors (stop-midi-clock *engine*)))
   (sleep 0.03d0)

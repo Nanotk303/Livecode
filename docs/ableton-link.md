@@ -97,8 +97,18 @@ Livecode can participate in Link start/stop sync:
 (live ... :link t :link-start-stop t)
 ```
 
-Not every Link application treats start/stop exactly the same way, but tempo,
-beat and phase synchronization are the essential shared timeline.
+When `:link-start-stop` is true, starting a new Livecode engine with `live`
+sends a Link start intention, and `stop-live` sends a Link stop intention.
+
+Manual start/stop commands remain available:
+
+```lisp
+(livecode:ableton-link-start :quantum 4)
+(livecode:ableton-link-stop)
+```
+
+Not every Link application treats start/stop exactly the same way, but Ableton
+Live should react when its Link Start/Stop Sync option is enabled.
 
 ## License note
 

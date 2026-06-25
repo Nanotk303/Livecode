@@ -252,6 +252,20 @@ Build the bridge in native/ first; then call this function before using
                       :start-stop (scene-link-start-stop scene))
     (setf (scene-tempo scene) (ableton-link-tempo))))
 
+(defun start-link-transport-for-scene (scene)
+  "Send a Link start intention when SCENE asks for start/stop sync."
+  (when (and scene
+             (scene-link-enabled scene)
+             (scene-link-start-stop scene))
+    (ableton-link-start :quantum (scene-link-quantum scene))))
+
+(defun stop-link-transport-for-scene (scene)
+  "Send a Link stop intention when SCENE asks for start/stop sync."
+  (when (and scene
+             (scene-link-enabled scene)
+             (scene-link-start-stop scene))
+    (ableton-link-stop)))
+
 (defun refresh-link-tempo-for-scene (scene)
   (when (and scene (scene-link-enabled scene))
     (setf (scene-tempo scene) (ableton-link-tempo))))

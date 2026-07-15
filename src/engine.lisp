@@ -835,10 +835,25 @@ event list."
   (dolist (event events)
     (dispatch-event-at-host-time event host-time)))
 
-(defun event-host-time (deadline)
+(defun monotonic-time-to-host-time (time)
+  "Map Livecode's monotonic scheduler time to CoreMIDI host time.
+
+The timestamped scheduler computes this mapping once per cycle and then places
+all events by exact offsets from that anchor.  That avoids tiny event-to-event
+rounding and sampling differences when dense streams, such as continuous
+sixteenth notes, are exposed."
   (+ (core-midi-host-time)
      (core-midi-seconds-to-host-ticks
-      (max 0.001d0 (- deadline (monotonic-seconds))))))
+      (- (coerce time 'double-float) (monotonic-seconds)))))
+
+(defun event-host-time (deadline)
+  (monotonic-time-to-host-time deadline))
+
+(defun event-host-time-from-cycle (cycle-host-start cycle-start deadline)
+  (+ cycle-host-start
+     (core-midi-seconds-to-host-ticks
+      (- (coerce deadline 'double-float)
+         (coerce cycle-start 'double-float)))))
 
 (defun note-event-identity (event)
   (list (midi-event-track event)
@@ -886,7 +901,8 @@ where Livecode orders note-off before note-on."
                  cutoff-time))))))
 
 (defun schedule-note-off-with-note-on (note-on note-off scene cycle-start
-                                               seconds-per-beat)
+                                               seconds-per-beat
+                                               cycle-host-start)
   "Timestamp NOTE-OFF when NOTE-ON is queued.
 
 CoreMIDI packets already queued ahead of a live-code swap cannot be cancelled.
@@ -897,12 +913,13 @@ If the note-on is queued but the scheduler later swaps before reaching the
   (when note-off
     (let* ((deadline (event-deadline scene note-off cycle-start
                                      seconds-per-beat))
-           (host-time (event-host-time deadline)))
+           (host-time (event-host-time-from-cycle
+                       cycle-host-start cycle-start deadline)))
       (dispatch-event-at-host-time note-off host-time))))
 
 (defun dispatch-event-group-at-host-time-with-paired-note-offs
     (events future-events scene cycle-start seconds-per-beat host-time
-     &optional cutoff-time)
+     cycle-host-start &optional cutoff-time)
   (let ((paired-note-offs nil))
     (dispatch-event-group-at-host-time events host-time)
     (dolist (event events)
@@ -913,7 +930,8 @@ If the note-on is queued but the scheduler later swaps before reaching the
                                         cutoff-time)
             (push note-off paired-note-offs)
             (schedule-note-off-with-note-on event note-off scene cycle-start
-                                            seconds-per-beat)))))
+                                            seconds-per-beat
+                                            cycle-host-start)))))
     paired-note-offs))
 
 (defun remove-paired-note-offs (events paired-note-offs)
@@ -977,6 +995,7 @@ If the note-on is queued but the scheduler later swaps before reaching the
   "Run one cycle while timestamping musical events shortly ahead of time."
   (let* ((seconds-per-beat (seconds-per-beat scene))
          (ahead *event-schedule-ahead-seconds*)
+         (cycle-host-start (monotonic-time-to-host-time cycle-start))
          (next-start
            (+ cycle-start
               (* seconds-per-beat
@@ -991,10 +1010,11 @@ If the note-on is queued but the scheduler later swaps before reaching the
                  (let ((result (wait-until-pending-swap engine)))
                    (return-from run-one-cycle-scheduled
                      (values result nil))))
-               (let* ((host-time (event-host-time deadline))
-             (queue-time (max (monotonic-seconds)
-                              (- deadline ahead)))
-             (result (wait-until-event-or-swap engine queue-time)))
+               (let* ((host-time (event-host-time-from-cycle
+                                  cycle-host-start cycle-start deadline))
+                      (queue-time (max (monotonic-seconds)
+                                       (- deadline ahead)))
+                      (result (wait-until-event-or-swap engine queue-time)))
                  (case result
                    (:swap (return-from run-one-cycle-scheduled
                             (values :swap nil)))
@@ -1005,28 +1025,26 @@ If the note-on is queued but the scheduler later swaps before reaching the
                             (dispatch-event-group-at-host-time-with-paired-note-offs
                              group rest scene cycle-start seconds-per-beat
                              host-time
+                             cycle-host-start
                              (pending-swap-time engine))))
                       (setf rest
                             (remove-paired-note-offs rest paired-note-offs)))
                     (when (same-deadline-p deadline next-start)
-                      (dispatch-event-group-at-host-time-with-paired-note-offs
-                       (scene-initial-events scene)
-                       (scene-events-after-initial scene)
-                       scene next-start seconds-per-beat host-time)
                       (return-from run-one-cycle-scheduled
-                        (values :complete next-start t))))))
+                        (values :complete next-start nil))))))
                (setf events rest)))
-    (let ((result (wait-until-event-or-swap engine next-start)))
+    ;; Let the following cycle queue its own beat-zero group from its stable
+    ;; CoreMIDI anchor.  Pre-dispatching that group here made the cycle boundary
+    ;; a special scheduling case and could produce a small audible stumble at
+    ;; the end of long repeated patterns.
+    (let* ((queue-time (max (monotonic-seconds)
+                            (- next-start ahead)))
+           (result (wait-until-event-or-swap engine queue-time)))
       (case result
         (:swap (values :swap nil))
         (:stopped (values :stopped nil))
         (:event
-         (let ((host-time (event-host-time next-start)))
-           (dispatch-event-group-at-host-time-with-paired-note-offs
-            (scene-initial-events scene)
-            (scene-events-after-initial scene)
-            scene next-start seconds-per-beat host-time))
-         (values :complete next-start t))))))
+         (values :complete next-start nil))))))
 
 (defun run-one-cycle (engine scene cycle-start skip-initial-p)
   (if (and *timestamp-midi-events*

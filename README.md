@@ -81,7 +81,7 @@ Stop everything:
 Emergency all-notes-off:
 
 ```lisp
-(panic)
+(live-panic)
 ```
 
 ## Documentation
